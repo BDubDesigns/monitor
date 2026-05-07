@@ -1,0 +1,12 @@
+{
+  "name": "server-monitor",
+  "version": "1.0.0",
+  "description": "Lightweight server resource monitor with REST API and web dashboard",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

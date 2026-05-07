@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monitor — {{HOSTNAME}}</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0d1117; color: #c9d1d9; min-height: 100vh; padding: 24px;
+  }
+  .header {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 24px; flex-wrap: wrap; gap: 8px;
+  }
+  .header h1 { font-size: 20px; font-weight: 600; color: #f0f6fc; }
+  .header .host { font-size: 13px; color: #8b949e; font-family: monospace; }
+  .header .updated { font-size: 12px; color: #484f58; }
+  .gauges {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px; margin-bottom: 24px;
+  }
+  .gauge {
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 16px;
+  }
+  .gauge .label { font-size: 11px; text-transform: uppercase; color: #8b949e; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .gauge .value { font-size: 32px; font-weight: 700; font-family: monospace; }
+  .gauge .bar-wrap { margin-top: 8px; height: 6px; background: #21262d; border-radius: 3px; overflow: hidden; }
+  .gauge .bar { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+  .gauge .detail { font-size: 12px; color: #8b949e; margin-top: 6px; }
+  .cpu .value { color: #f0883e; } .cpu .bar { background: #f0883e; }
+  .ram .value { color: #58a6ff; } .ram .bar { background: #58a6ff; }
+  .disk .value { color: #3fb950; } .disk .bar { background: #3fb950; }
+  .net .value { color: #bc8cff; } .net .bar { background: #bc8cff; }
+
+  .load-avg { display: flex; gap: 16px; margin-top: 6px; font-size: 13px; color: #8b949e; }
+  .load-avg span { font-family: monospace; color: #c9d1d9; }
+
+  .charts { margin-bottom: 24px; }
+  .chart-controls { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .chart-controls button {
+    background: #21262d; color: #c9d1d9; border: 1px solid #30363d;
+    border-radius: 6px; padding: 6px 16px; font-size: 12px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .chart-controls button:hover { background: #30363d; }
+  .chart-controls button.active { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+  .chart-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 12px; margin-bottom: 12px; }
+  .chart-box {
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 16px; position: relative;
+  }
+  .chart-box h3 { font-size: 13px; font-weight: 600; margin-bottom: 8px; color: #f0f6fc; }
+  .chart-box canvas { max-height: 200px; }
+
+  .refresh { font-size: 12px; color: #484f58; text-align: center; margin-top: 16px; }
+  .refresh .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #3fb950; margin-right: 4px; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  @media (max-width: 500px) {
+    body { padding: 12px; }
+    .gauges { grid-template-columns: 1fr 1fr; }
+    .chart-row { grid-template-columns: 1fr; }
+    .gauge .value { font-size: 24px; }
+  }
+</style>
+</head>
+<body>
+  <div class="header">
+    <h1>Server Monitor</h1>
+    <div class="host">{{HOSTNAME}}</div>
+    <div class="updated" id="updated"></div>
+  </div>
+
+  <div class="gauges">
+    <div class="gauge cpu">
+      <div class="label">CPU</div>
+      <div class="value" id="cpuVal">--</div>
+      <div class="bar-wrap"><div class="bar" id="cpuBar" style="width:0%"></div></div>
+      <div class="detail" id="cpuDetail"></div>
+    </div>
+    <div class="gauge ram">
+      <div class="label">RAM</div>
+      <div class="value" id="ramVal">--</div>
+      <div class="bar-wrap"><div class="bar" id="ramBar" style="width:0%"></div></div>
+      <div class="detail" id="ramDetail"></div>
+    </div>
+    <div class="gauge disk">
+      <div class="label">Disk</div>
+      <div class="value" id="diskVal">--</div>
+      <div class="bar-wrap"><div class="bar" id="diskBar" style="width:0%"></div></div>
+      <div class="detail" id="diskDetail"></div>
+    </div>
+    <div class="gauge net">
+      <div class="label">Network</div>
+      <div class="value" id="netVal" style="font-size:14px">--</div>
+      <div class="load-avg">
+        <div>Load: <span id="load1">--</span> / <span id="load5">--</span> / <span id="load15">--</span></div>
+      </div>
+      <div class="detail" id="netDetail"></div>
+    </div>
+  </div>
+
+  <div class="charts">
+    <div class="chart-controls">
+      <button data-range="1h" class="active">1h</button>
+      <button data-range="6h">6h</button>
+      <button data-range="24h">24h</button>
+      <button data-range="7d">7d</button>
+    </div>
+    <div class="chart-row">
+      <div class="chart-box">
+        <h3 style="color:#f0883e">CPU %</h3>
+        <canvas id="cpuChart"></canvas>
+      </div>
+      <div class="chart-box">
+        <h3 style="color:#58a6ff">RAM %</h3>
+        <canvas id="ramChart"></canvas>
+      </div>
+    </div>
+    <div class="chart-row">
+      <div class="chart-box">
+        <h3 style="color:#3fb950">Disk %</h3>
+        <canvas id="diskChart"></canvas>
+      </div>
+      <div class="chart-box">
+        <h3 style="color:#bc8cff">Network KB/s</h3>
+        <canvas id="netChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="refresh"><span class="dot"></span> Auto-refreshing every 30s</div>
+
+<script>
+const RANGE_MAP = { '1h': 3600, '6h': 21600, '24h': 86400, '7d': 604800 };
+let range = '1h';
+
+const colors = {
+  grid: 'rgba(48,54,61,0.5)',
+  text: '#8b949e',
+  cpu: '#f0883e',
+  ram: '#58a6ff',
+  disk: '#3fb950',
+  net_rx: '#58a6ff',
+  net_tx: '#bc8cff'
+};
+
+function makeChart(canvasId, label, color, yMax) {
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  return new Chart(ctx, {
+    type: 'line',
+    data: { labels: [], datasets: [{ label, data: [], borderColor: color, backgroundColor: color + '20', fill: true, borderWidth: 1.5, pointRadius: 0, tension: 0.3 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 0 },
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: colors.text, maxTicksLimit: 8, font: { size: 10 } }, grid: { color: colors.grid } },
+        y: { min: 0, max: yMax || 100, ticks: { color: colors.text, callback: v => v + '%', font: { size: 10 } }, grid: { color: colors.grid } }
+      }
+    }
+  });
+}
+
+function makeNetChart(canvasId) {
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  return new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        { label: 'RX', data: [], borderColor: colors.net_rx, backgroundColor: colors.net_rx + '20', fill: true, borderWidth: 1.5, pointRadius: 0, tension: 0.3 },
+        { label: 'TX', data: [], borderColor: colors.net_tx, backgroundColor: colors.net_tx + '20', fill: true, borderWidth: 1.5, pointRadius: 0, tension: 0.3 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 0 },
+      plugins: { legend: { display: true, labels: { color: colors.text, font: { size: 10 }, boxWidth: 12 } } },
+      scales: {
+        x: { ticks: { color: colors.text, maxTicksLimit: 8, font: { size: 10 } }, grid: { color: colors.grid } },
+        y: { ticks: { color: colors.text, callback: v => v + ' KB/s', font: { size: 10 } }, grid: { color: colors.grid } }
+      }
+    }
+  });
+}
+
+const cpuChart = makeChart('cpuChart', 'CPU', colors.cpu);
+const ramChart = makeChart('ramChart', 'RAM', colors.ram);
+const diskChart = makeChart('diskChart', 'Disk', colors.disk);
+const netChart = makeNetChart('netChart');
+
+function fmtBytes(b) {
+  if (b >= 1e12) return (b / 1e12).toFixed(1) + ' TB';
+  if (b >= 1e9) return (b / 1e9).toFixed(1) + ' GB';
+  if (b >= 1e6) return (b / 1e6).toFixed(1) + ' MB';
+  if (b >= 1e3) return (b / 1e3).toFixed(1) + ' KB';
+  return b + ' B';
+}
+
+function fmtRate(bps) {
+  if (bps >= 1e6) return (bps / 1e6).toFixed(1) + ' MB/s';
+  if (bps >= 1e3) return (bps / 1e3).toFixed(1) + ' KB/s';
+  return bps + ' B/s';
+}
+
+function updateGauges(stats) {
+  document.getElementById('cpuVal').textContent = stats.cpu_percent + '%';
+  document.getElementById('cpuBar').style.width = stats.cpu_percent + '%';
+  document.getElementById('cpuDetail').textContent = stats.cpu_cores + ' cores';
+
+  document.getElementById('ramVal').textContent = stats.ram_percent + '%';
+  document.getElementById('ramBar').style.width = stats.ram_percent + '%';
+  document.getElementById('ramDetail').textContent = fmtBytes(stats.ram_used) + ' / ' + fmtBytes(stats.ram_total);
+
+  document.getElementById('diskVal').textContent = stats.disk_percent + '%';
+  document.getElementById('diskBar').style.width = stats.disk_percent + '%';
+  document.getElementById('diskDetail').textContent = fmtBytes(stats.disk_used) + ' / ' + fmtBytes(stats.disk_total);
+
+  document.getElementById('load1').textContent = stats.load_1m;
+  document.getElementById('load5').textContent = stats.load_5m;
+  document.getElementById('load15').textContent = stats.load_15m;
+
+  document.getElementById('netVal').textContent = 'RX ' + fmtRate(stats.net_rx_rate) + ' / TX ' + fmtRate(stats.net_tx_rate);
+  document.getElementById('netDetail').textContent = 'Total: ' + fmtBytes(stats.net_rx_total) + ' / ' + fmtBytes(stats.net_tx_total);
+
+  document.getElementById('updated').textContent = 'Updated ' + new Date(stats.ts * 1000).toLocaleTimeString();
+}
+
+function updateCharts(data) {
+  const labels = data.map(d => new Date(d.ts * 1000).toLocaleTimeString());
+  const cpuData = data.map(d => d.cpu_percent);
+  const ramData = data.map(d => d.ram_percent);
+  const diskData = data.map(d => d.disk_percent);
+  const rxData = data.map(d => Math.round(d.net_rx_rate / 1024));
+  const txData = data.map(d => Math.round(d.net_tx_rate / 1024));
+
+  cpuChart.data.labels = labels;
+  cpuChart.data.datasets[0].data = cpuData;
+  cpuChart.update();
+
+  ramChart.data.labels = labels;
+  ramChart.data.datasets[0].data = ramData;
+  ramChart.update();
+
+  diskChart.data.labels = labels;
+  diskChart.data.datasets[0].data = diskData;
+  diskChart.update();
+
+  netChart.data.labels = labels;
+  netChart.data.datasets[0].data = rxData;
+  netChart.data.datasets[1].data = txData;
+  netChart.update();
+}
+
+async function fetchCurrent() {
+  const res = await fetch('/api/current');
+  const stats = await res.json();
+  updateGauges(stats);
+}
+
+async function fetchHistory() {
+  const seconds = RANGE_MAP[range];
+  const until = Math.floor(Date.now() / 1000);
+  const since = until - seconds;
+  const res = await fetch(`/api/history?since=${since}&until=${until}`);
+  const data = await res.json();
+  if (data.length > 300) {
+    const step = Math.ceil(data.length / 300);
+    const downsampled = data.filter((_, i) => i % step === 0);
+    updateCharts(downsampled);
+  } else {
+    updateCharts(data);
+  }
+}
+
+function refreshAll() {
+  fetchCurrent();
+  fetchHistory();
+}
+
+document.querySelectorAll('.chart-controls button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.chart-controls button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    range = btn.dataset.range;
+    fetchHistory();
+  });
+});
+
+refreshAll();
+setInterval(refreshAll, 30000);
+</script>
+</body>
+</html>
