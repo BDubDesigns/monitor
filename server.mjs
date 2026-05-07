@@ -7,7 +7,7 @@ import { collect } from './collect.mjs';
 import { append, query, latest, cleanup } from './store.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = parseInt(process.env.PORT || '3099');
+const PORT = parseInt(process.env.MONITOR_PORT || '3099');
 const BIND = process.env.BIND || '0.0.0.0';
 const INTERVAL = parseInt(process.env.INTERVAL || '30000');
 const HOSTNAME = os.hostname();
