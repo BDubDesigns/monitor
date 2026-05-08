@@ -5,6 +5,7 @@ import os from 'os';
 import { fileURLToPath } from 'url';
 import { collect } from './collect.mjs';
 import { append, query, latest, cleanup } from './store.mjs';
+import { check, send } from './alerts.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.MONITOR_PORT || '3099');
@@ -97,6 +98,15 @@ function start() {
     setInterval(() => {
       const stats = collect();
       append(stats);
+
+      const webhook = process.env.DISCORD_WEBHOOK;
+      if (webhook) {
+        const triggered = check(stats);
+        for (const alert of triggered) {
+          send(webhook, alert, HOSTNAME);
+          console.log(`[monitor] alert: ${alert.type} at ${alert.value}%`);
+        }
+      }
     }, INTERVAL);
   });
 }
