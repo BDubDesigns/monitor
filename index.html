@@ -60,6 +60,23 @@
   .refresh .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #3fb950; margin-right: 4px; animation: pulse 2s infinite; }
   @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
+  .broadcast {
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 12px 16px; margin-bottom: 16px; display: flex; gap: 10px; align-items: center;
+  }
+  .broadcast input {
+    flex: 1; background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+    color: #c9d1d9; padding: 8px 12px; font-size: 13px; outline: none;
+  }
+  .broadcast input:focus { border-color: #58a6ff; }
+  .broadcast button {
+    background: #238636; border: 1px solid #2ea043; color: #fff; border-radius: 6px;
+    padding: 8px 16px; font-size: 12px; cursor: pointer; white-space: nowrap;
+  }
+  .broadcast button:hover { background: #2ea043; }
+  .broadcast .sent { color: #3fb950; font-size: 11px; min-width: 40px; text-align: center; }
+
+
   @media (max-width: 500px) {
     body { padding: 12px; }
     .gauges { grid-template-columns: 1fr 1fr; }
@@ -73,6 +90,12 @@
     <h1>Server Monitor</h1>
     <div class="host">{{HOSTNAME}}</div>
     <div class="updated" id="updated"></div>
+  </div>
+
+  <div class="broadcast">
+    <input id="msg" type="text" placeholder="Send to #SERVER-EVENTS…" maxlength="2000" />
+    <button onclick="doBroadcast()">Send</button>
+    <span class="sent" id="sent"></span>
   </div>
 
   <div class="gauges">
@@ -294,6 +317,35 @@ document.querySelectorAll('.chart-controls button').forEach(btn => {
 
 refreshAll();
 setInterval(refreshAll, 30000);
+
+async function doBroadcast() {
+  const input = document.getElementById('msg');
+  const msg = input.value.trim();
+  if (!msg) return;
+  try {
+    const res = await fetch('/api/broadcast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      document.getElementById('sent').textContent = 'Sent!';
+      input.value = '';
+      setTimeout(() => document.getElementById('sent').textContent = '', 2000);
+    } else {
+      document.getElementById('sent').textContent = 'Failed';
+      setTimeout(() => document.getElementById('sent').textContent = '', 2000);
+    }
+  } catch (_) {
+    document.getElementById('sent').textContent = 'Error';
+    setTimeout(() => document.getElementById('sent').textContent = '', 2000);
+  }
+}
+
+document.getElementById('msg').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doBroadcast();
+});
 </script>
 </body>
 </html>

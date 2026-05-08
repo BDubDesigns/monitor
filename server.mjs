@@ -61,9 +61,50 @@ function handleAPI(req) {
   return err(404, 'Not found');
 }
 
+function readBody(req) {
+  return new Promise(resolve => {
+    let data = '';
+    req.on('data', c => data += c);
+    req.on('end', () => {
+      try { resolve(JSON.parse(data)); } catch (_) { resolve(null); }
+    });
+  });
+}
+
+async function handleBroadcast(req, res) {
+  const webhook = process.env.DISCORD_WEBHOOK;
+  if (!webhook) {
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(json({ error: 'No webhook configured' }));
+    return;
+  }
+  const body = await readBody(req);
+  if (!body || !body.message) {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(json({ error: 'Missing message field' }));
+    return;
+  }
+  try {
+    const resp = await fetch(webhook, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: `Server Monitor — ${HOSTNAME}`,
+        content: body.message
+      })
+    });
+    res.writeHead(resp.ok ? 200 : 502, { 'Content-Type': 'application/json' });
+    res.end(json({ ok: resp.ok, status: resp.status }));
+  } catch (e) {
+    res.writeHead(502, { 'Content-Type': 'application/json' });
+    res.end(json({ error: 'Webhook unreachable' }));
+  }
+}
+
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -78,6 +119,10 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.url.startsWith('/api/')) {
+    if (req.method === 'POST' && req.url === '/api/broadcast') {
+      handleBroadcast(req, res);
+      return;
+    }
     const { code, body } = handleAPI(req);
     res.writeHead(code, { 'Content-Type': 'application/json' });
     res.end(body);
