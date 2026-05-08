@@ -129,6 +129,15 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  const filePath = path.join(__dirname, req.url === '/' ? 'index.html' : req.url);
+  if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+    const ext = path.extname(filePath);
+    const types = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml' };
+    res.writeHead(200, { 'Content-Type': types[ext] || 'application/octet-stream' });
+    res.end(fs.readFileSync(filePath));
+    return;
+  }
+
   res.writeHead(404, { 'Content-Type': 'application/json' });
   res.end(json({ error: 'Not found' }));
 });

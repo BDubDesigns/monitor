@@ -1,11 +1,11 @@
 const THRESHOLDS = {
-  cpu: 90,
-  ram: 90,
-  disk: 85
+  cpu: parseInt(process.env.ALERT_CPU) || 90,
+  ram: parseInt(process.env.ALERT_RAM) || 90,
+  disk: parseInt(process.env.ALERT_DISK) || 85
 };
 
-const COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes between repeat alerts
-const CONSECUTIVE = 3; // number of consecutive triggers before alerting
+const COOLDOWN_MS = (parseInt(process.env.ALERT_COOLDOWN) || 15) * 60 * 1000;
+const CONSECUTIVE = parseInt(process.env.ALERT_CONSECUTIVE) || 3;
 
 const state = {
   lastAlerted: {},

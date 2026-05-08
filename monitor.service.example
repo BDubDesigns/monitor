@@ -1,0 +1,24 @@
+[Unit]
+Description=Server Resource Monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=<your-user>
+WorkingDirectory=<path-to-monitor>
+ExecStart=/usr/bin/node <path-to-monitor>/server.mjs
+Restart=always
+RestartSec=10
+Environment=NODE_ENV=production
+Environment=MONITOR_PORT=3099
+Environment=BIND=0.0.0.0
+# Environment=DISCORD_WEBHOOK=https://discord.com/api/webhooks/...
+# Environment=ALERT_CPU=90
+# Environment=ALERT_RAM=90
+# Environment=ALERT_DISK=85
+# Environment=ALERT_COOLDOWN=15
+# Environment=ALERT_CONSECUTIVE=3
+
+[Install]
+WantedBy=multi-user.target
