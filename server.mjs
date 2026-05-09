@@ -129,6 +129,21 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  const urlPath = new URL(req.url, `http://${req.headers.host}`).pathname;
+  const resolved = path.resolve(__dirname, urlPath === '/' ? 'index.html' : '.' + urlPath);
+  const ext = path.extname(resolved);
+  const types = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml' };
+  if (!resolved.startsWith(__dirname) || !types[ext]) {
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(json({ error: 'Not found' }));
+    return;
+  }
+  if (fs.existsSync(resolved) && fs.statSync(resolved).isFile()) {
+    res.writeHead(200, { 'Content-Type': types[ext] });
+    res.end(fs.readFileSync(resolved));
+    return;
+  }
+
   res.writeHead(404, { 'Content-Type': 'application/json' });
   res.end(json({ error: 'Not found' }));
 });

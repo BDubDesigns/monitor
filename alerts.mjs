@@ -1,11 +1,18 @@
+function numEnv(key, fallback) {
+  const raw = process.env[key];
+  if (raw === undefined || raw === '') return fallback;
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 const THRESHOLDS = {
-  cpu: 90,
-  ram: 90,
-  disk: 85
+  cpu: numEnv('ALERT_CPU', 90),
+  ram: numEnv('ALERT_RAM', 90),
+  disk: numEnv('ALERT_DISK', 85)
 };
 
-const COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes between repeat alerts
-const CONSECUTIVE = 3; // number of consecutive triggers before alerting
+const COOLDOWN_MS = numEnv('ALERT_COOLDOWN', 15) * 60 * 1000;
+const CONSECUTIVE = numEnv('ALERT_CONSECUTIVE', 3);
 
 const state = {
   lastAlerted: {},
