@@ -1,11 +1,18 @@
+function numEnv(key, fallback) {
+  const raw = process.env[key];
+  if (raw === undefined || raw === '') return fallback;
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 const THRESHOLDS = {
-  cpu: parseInt(process.env.ALERT_CPU) || 90,
-  ram: parseInt(process.env.ALERT_RAM) || 90,
-  disk: parseInt(process.env.ALERT_DISK) || 85
+  cpu: numEnv('ALERT_CPU', 90),
+  ram: numEnv('ALERT_RAM', 90),
+  disk: numEnv('ALERT_DISK', 85)
 };
 
-const COOLDOWN_MS = (parseInt(process.env.ALERT_COOLDOWN) || 15) * 60 * 1000;
-const CONSECUTIVE = parseInt(process.env.ALERT_CONSECUTIVE) || 3;
+const COOLDOWN_MS = numEnv('ALERT_COOLDOWN', 15) * 60 * 1000;
+const CONSECUTIVE = numEnv('ALERT_CONSECUTIVE', 3);
 
 const state = {
   lastAlerted: {},
